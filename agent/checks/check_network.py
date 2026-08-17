@@ -1,63 +1,72 @@
 import psutil
 import socket
 import subprocess
+from utils import print_output
 
+# Сетевые интерфейсы
+interfaces_list = []
+for interface_name, addresses in psutil.net_if_addrs().items():
+    interfaces_list.append({
+        "name": interface_name,
+        "addresses": [{"address": a.address, "family": str(a.family)} for a in addresses]
+    })
 
-print("\n=== Сетевые интерфейсы ===")
-addrs_dict = psutil.net_if_addrs()
-
-
-for interface_name, addresses in addrs_dict.items():
-    print(f"Интерфейс: {interface_name}")
-    for item in addresses:
-        print(f"  Адрес: {item.address}, Семейство: {item.family}")
-
-
-print("\n=== Открытые порты ===")
+# Открытые порты
+open_ports_list = []
 for port in psutil.net_connections(kind='inet'):
     if port.status == 'LISTEN':
-        print(f"Port: {port.laddr.port} — PID: {port.pid}")
+        open_ports_list.append({
+            "port": port.laddr.port,
+            "pid": port.pid
+        })
 
-
-print("\n=== Активные соединения ===")
-active_con_count = 0
-active_con = psutil.net_connections(kind='inet')
+# Активные соединения
+active_connections = []
 remote_ip_count = {}
-for established in active_con:
-    if established.status == 'ESTABLISHED':
-        active_con_count += 1
-        print(
-            f"Local: {established.laddr.ip}:{established.laddr.port} → Remote: {established.raddr.ip}:{established.raddr.port}")
-        remote_ip = established.raddr.ip
+for conn in psutil.net_connections(kind='inet'):
+    if conn.status == 'ESTABLISHED':
+        active_connections.append({
+            "local": f"{conn.laddr.ip}:{conn.laddr.port}",
+            "remote": f"{conn.raddr.ip}:{conn.raddr.port}"
+        })
+        remote_ip = conn.raddr.ip
         remote_ip_count[remote_ip] = remote_ip_count.get(remote_ip, 0) + 1
-print(
-    f"Топ-5 удаленных IP: {sorted(remote_ip_count.items(), key=lambda x: x[1], reverse=True)[:5]}")
-print(f"Активных соединений: {active_con_count}")
 
-print("\n=== DNS ===")
-dns_socket = socket.getaddrinfo('google.com', 443, proto=socket.IPPROTO_TCP)
-if dns_socket:
-    print("DNS работает")
-else:
-    print("DNS не работает")
+top_remote_ips = sorted(
+    remote_ip_count.items(), key=lambda x: x[1], reverse=True)[:5]
 
-dns_server_count = 0
-dns_server = subprocess.run(
-    ['grep', '-iE', 'nameserver', '/etc/resolv.conf'], capture_output=True, text=True)
+# DNS
+dns_works = bool(socket.getaddrinfo(
+    'google.com', 443, proto=socket.IPPROTO_TCP))
 
-for dns_server_line in dns_server.stdout.splitlines():
-    if 'nameserver' in dns_server_line.lower():
-        dns_server_count += 1
-        print(f"DNS-сервер {dns_server_count}: {dns_server_line.strip()}")
-print(f"Количество: {dns_server_count}")
-if dns_server_count == 0:
-    print("Не найдено")
+dns_servers = []
+dns_result = subprocess.run(
+    ['grep', '-iE', 'nameserver', '/etc/resolv.conf'],
+    capture_output=True, text=True)
+for line in dns_result.stdout.splitlines():
+    if 'nameserver' in line.lower():
+        dns_servers.append(line.split()[-1])
 
-print("\n=== Основной шлюз ===")
-gateway = subprocess.run(
-    ["ip", "route", "show", "default"],
-    capture_output=True,
-    text=True
-)
-gateway_res = gateway.stdout.split()[2]
-print(f"Основной шлюз: {gateway_res}")
+# Основной шлюз
+gateway = ""
+gateway_result = subprocess.run(
+    ["ip", "route", "show", "default"], capture_output=True, text=True)
+if gateway_result.stdout:
+    gateway = gateway_result.stdout.split()[2]
+
+# Собираем словарь
+data = {
+    "interfaces": interfaces_list,
+    "open_ports": open_ports_list,
+    "active_connections": {
+        "count": len(active_connections),
+        "top_remote_ips": top_remote_ips
+    },
+    "dns": {
+        "works": dns_works,
+        "servers": dns_servers
+    },
+    "gateway": gateway
+}
+
+print_output(data)
