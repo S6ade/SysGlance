@@ -1,59 +1,62 @@
 import subprocess
+from utils import print_output
 
-# Выводим ошибки journalctl, с выводом номера строки,содержимого и количество ошибок
-print("\n=== Ошибки journalctl ===")
-process = subprocess.run(['journalctl', '-p', '3'],
-                         capture_output=True, text=True)
+# Ошибки journalctl
+journal_data = []
+journal_result = subprocess.run(
+    ['journalctl', '-p', '3'], capture_output=True, text=True)
 
-error_count = 0
-
-for line in process.stdout.splitlines():
-    if "error" in line.lower():
-        error_count += 1
-        print(f"Ошибка найдена в строке: {error_count}")
-        print(f"Содержимое: {line.strip()}")
-        if error_count >= 20:
+for line in journal_result.stdout.splitlines():
+    if 'error' in line.lower():
+        journal_data.append(line.strip())
+        if len(journal_data) >= 20:
             break
-print(f"Колличество ошибок: {error_count}")
 
-# Выводим строк ошибок из системного лога
-error_log = subprocess.run(
-    ['grep', '-iE', "error|fail|critical", '/var/log/syslog'], capture_output=True, text=True)
+# Ошибки syslog
+syslog_data = []
+syslog_result = subprocess.run(
+    ['grep', '-iE', 'error|fail|critical', '/var/log/syslog'],
+    capture_output=True, text=True)
 
-lines = error_log.stdout.splitlines()
-for line in lines[-20:]:
-    print(line)
+for line in syslog_result.stdout.splitlines()[-20:]:
+    syslog_data.append(line.strip())
 
-# Выводим Сообщение о нехватке памяти и "убийстве" процессов
-print("\n=== OOM-убийства ===")
-journal_message_count = 0
-journal_message = subprocess.run(
+# OOM-убийства
+oom_data = []
+oom_result = subprocess.run(
     ['journalctl', '-k'], capture_output=True, text=True)
 
-for line_journal in journal_message.stdout.splitlines():
-    if 'oom' in line_journal.lower():
-        journal_message_count += 1
-        print(f"Ошибка найдена в строке: {journal_message_count}")
-        print(f"Содержимое: {line_journal.strip()}")
-print(f"Колличество ошибок: {journal_message_count}")
-if journal_message_count == 0:
-    print("Ошибок не найдено")
-else:
-    print(f"Количество ошибок: {journal_message_count}")
+for line in oom_result.stdout.splitlines():
+    if 'oom' in line.lower():
+        oom_data.append(line.strip())
 
+# Ошибки ядра
+kernel_data = []
+kernel_result = subprocess.run(
+    ['dmesg', '-l'], capture_output=True, text=True)
 
-# Выводим ошибки ядра и оборудования
-print("\n=== Ошибки ядра ===")
+for line in kernel_result.stdout.splitlines():
+    if 'error' in line.lower():
+        kernel_data.append(line.strip())
 
-error_cor_count = 0
-error_cor = subprocess.run(['dmesg', '-l'], capture_output=True, text=True)
-for line_cor in error_cor.stdout.splitlines():
-    if 'error' in line_cor.lower():
-        error_cor_count += 1
-        print(f"Ошибка найдена в строке: {error_cor_count}")
-        print(f"Содержимое: {line_cor.strip()}")
-print(f"Колличество ошибок: {error_cor_count}")
-if error_cor_count == 0:
-    print("Ошибок не найдено")
-else:
-    print(f"Количество ошибок: {error_cor_count}")
+# Собираем словарь
+data = {
+    "journalctl_errors": {
+        "count": len(journal_data),
+        "lines": journal_data
+    },
+    "syslog_errors": {
+        "count": len(syslog_data),
+        "lines": syslog_data
+    },
+    "oom_kills": {
+        "count": len(oom_data),
+        "lines": oom_data
+    },
+    "kernel_errors": {
+        "count": len(kernel_data),
+        "lines": kernel_data
+    }
+}
+
+print_output(data)

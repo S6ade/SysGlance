@@ -1,5 +1,6 @@
 import subprocess
-
+import json
+from utils import print_output
 
 scripts = [
     "check_quick.py",
@@ -10,10 +11,18 @@ scripts = [
     "check_services.py",
 ]
 
+results = {}
+
 for script in scripts:
     result = subprocess.run(
-        ['python3', script], capture_output=True, text=True)
-    print(f"=== {script} ===")
-    print(result.stdout)
-    if result.returncode != 0:
-        print(f"Ошибка в {script}: {result.stderr}")
+        ['python3', script, '--json'], capture_output=True, text=True)
+    try:
+        results[script.replace('.py', '')] = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        results[script.replace('.py', '')] = {
+            "error": result.stderr.strip() or "Скрипт не выполнен"
+        }
+
+data = {"full_report": results}
+
+print_output(data)
