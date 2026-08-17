@@ -1,7 +1,9 @@
+# Утилиты для вывода данных в текстовом или JSON-формате
 import json
 import sys
 
 
+# Рекурсивно форматирует словари и списки в читаемый текст
 def _format_text(data, indent=0):
     lines = []
     prefix = "  " * indent
@@ -25,6 +27,7 @@ def _format_text(data, indent=0):
     return lines
 
 
+# Выводит данные: JSON при --json, иначе читаемый текст
 def print_output(data: dict):
     if '--json' in sys.argv:
         print(json.dumps(data, indent=2, ensure_ascii=False))
