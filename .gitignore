@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+venv/
+myenv/
+env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+
+# Секреты
+.env
+*.env
+*.key
+*.pem
+*.crt
+
+
+# Логи
+*.log
+
+# Артефакты
+dist/
+build/
